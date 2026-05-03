@@ -1002,6 +1002,18 @@
                     const row = data[0];
                     tag.textContent = row.briefing_date || 'DATE UNKNOWN';
                     let content = row.compiled_content;
+                    if (!content) { el.textContent = 'No briefing content.'; return; }
+                    // Unwrap double-encoded JSON: {"text":"## Morning Briefing..."}
+                    if (typeof content === 'string') {
+                        try { content = JSON.parse(content); } catch (e) { }
+                    }
+                    if (typeof content === 'object' && content !== null) {
+                        content = content.text || content.content || content.briefing || JSON.stringify(content, null, 2);
+                    }
+                    if (typeof content === 'string') {
+                        content = content.replace(/\\n/g, '\n').replace(/^["']|["']$/g, '');
+                    }
+                    el.classList.remove('briefing-loading');
                     if (content === null || content === undefined) { el.textContent = 'No briefing content.'; return; }
                     // Unwrap double-encoded JSON
                     if (typeof content === 'string') {
