@@ -988,6 +988,42 @@
         // DATE
         const d = new Date(); document.getElementById('date-display').textContent = d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }).toUpperCase();
 
+
+        // Converts markdown string → HTML string
+// Handles: headers (###, ##, #), bold, italic, bullet lists, line breaks
+function renderMarkdown(md) {
+  if (!md) return '';
+
+  return md
+    // Headers — order matters: ### before ## before #
+    .replace(/^### (.+)$/gm, '<h3>$1</h3>')
+    .replace(/^## (.+)$/gm,  '<h2>$1</h2>')
+    .replace(/^# (.+)$/gm,   '<h1>$1</h1>')
+
+    // Bold and italic
+    .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
+    .replace(/\*(.+?)\*/g,     '<em>$1</em>')
+
+    // Bullet lists (lines starting with - or *)
+    .replace(/^\s*[-*] (.+)$/gm, '<li>$1</li>')
+
+    // Horizontal rules
+    .replace(/^---$/gm, '<hr>')
+
+    // Wrap consecutive <li> in <ul>
+    .replace(/(<li>.*<\/li>\n?)+/g, match => `<ul>${match}</ul>`)
+
+    // Double newline → paragraph break
+    .replace(/\n\n/g, '</p><p>')
+
+    // Single newline → line break (within a paragraph)
+    .replace(/\n/g, '<br>')
+
+    // Wrap whole thing in a paragraph
+    .replace(/^(.+)/, '<p>$1')
+    .replace(/(.+)$/, '$1</p>');
+}
+
         // SUPABASE BRIEFING FETCH
         async function loadBriefing() {
             const url = 'https://hzqfgrynxcuiyzyyfmvi.supabase.co/rest/v1/morning_briefings?order=briefing_date.desc&limit=1&select=briefing_date,compiled_content';
@@ -1002,7 +1038,10 @@
                     const row = data[0];
                     tag.textContent = row.briefing_date || 'DATE UNKNOWN';
                     let content = row.compiled_content;
+
+                    // Guard: nothing stored
                     if (!content) { el.textContent = 'No briefing content.'; return; }
+
                     // Unwrap double-encoded JSON: {"text":"## Morning Briefing..."}
                     if (typeof content === 'string') {
                         try { content = JSON.parse(content); } catch (e) { }
@@ -1013,20 +1052,11 @@
                     if (typeof content === 'string') {
                         content = content.replace(/\\n/g, '\n').replace(/^["']|["']$/g, '');
                     }
+
                     el.classList.remove('briefing-loading');
-                    if (content === null || content === undefined) { el.textContent = 'No briefing content.'; return; }
-                    // Unwrap double-encoded JSON
-                    if (typeof content === 'string') {
-                        try { content = JSON.parse(content); } catch (e) { }
-                    }
-                    if (typeof content === 'object' && content !== null) {
-                        content = content.text || content.content || content.briefing || JSON.stringify(content, null, 2);
-                    }
-                    if (typeof content === 'string') {
-                        content = content.replace(/\\n/g, '\n').replace(/^["']|["']$/g, '');
-                    }
-                    el.classList.remove('briefing-loading');
-                    el.textContent = content;
+
+                    // ✅ Render markdown as HTML (not raw text)
+                    el.innerHTML = renderMarkdown(content);
                 } else {
                     tag.textContent = 'NO DATA';
                     el.textContent = 'No briefing found in database.';
